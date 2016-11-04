@@ -2,15 +2,23 @@
 # coding=utf-8
 
 import MySQLdb
+import ConfigParser
 
 
 class MySQLConnect(object):
+    config = ConfigParser.ConfigParser()
+    config.read('./fangTX/mysqlapi/sql_cfg.ini')
+    host = config.get('sql_cfg', 'host')
+    user = config.get('sql_cfg', 'user')
+    passwd = config.get('sql_cfg', 'passwd')
+    dbname = config.get('sql_cfg', 'db')
+    charset = config.get('sql_cfg', 'charset')
     db = MySQLdb.connect(
-        host='120.24.90.29',
-        user='cnfsdata1',
-        passwd='cnfsdata1',
-        db='cnfsdata',
-        charset='utf8'
+        host=host,
+        user=user,
+        passwd=passwd,
+        db=dbname,
+        charset=charset,
     )
     cursor = db.cursor()
 

@@ -9,7 +9,7 @@ from fangTX.items import HubItem
 lock = threading.Lock()
 logging.basicConfig(
     filemode='w',
-    filename='./xian_fang_sale.log',
+    filename='./fz_fang_sale.log',
     format='%(asctime)s %(filename)s [line:%(lineno)d] %(levelname)s %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
 )
@@ -17,7 +17,7 @@ logging.basicConfig(
 
 class FangTXCrawl(scrapy.Spider):
     item = HubItem()
-    name = 'fangtx'
+    name = 'fangtx_sale'
     all_url = set([])
     second_url = []
 
@@ -50,29 +50,33 @@ class FangTXCrawl(scrapy.Spider):
             sub_area_url_full = response.urljoin(sub_area_url)
             logging.debug('sub_area_url_full: %s' % sub_area_url_full)
             logging.debug('sub_area_name: %s' % sub_area_name)
-            yield scrapy.http.Request(sub_area_url_full, callback=self.get_page_num)
+            yield scrapy.http.Request(sub_area_url_full, callback=self.get_price)
+
+    def get_price(self, response):
+        logging.debug('i am in get_price')
+        price_part_url = response.xpath('//li[@id="list_D02_11"]/p/a/@href').extract()[1:]
+        for price in price_part_url:
+            logging.debug('price: %s' % price)
+            price_url_full = response.urljoin(price)
+            yield scrapy.Request(price_url_full, callback=self.get_page_num, dont_filter=True)
 
     def get_page_num(self, response, time=1):
-        house_num = response.xpath(self.config.get(self.spidername, 'house_num_xpath')).extract_first()
-        num_per_page = len(response.xpath(self.config.get(self.spidername, 'num_per_page_xpath')))
-        logging.debug('current_url: %s' % response.url)
-        logging.debug('house_num: %s,%s' % (house_num, type(house_num)))
-        logging.debug('num_per_page: %s,%s' % (num_per_page, type(num_per_page)))
-        print 'time', time
-        if not num_per_page:
+        page_num = response.xpath(self.config.get(self.spidername, 'house_num_xpath')).re_first('\d+/(\d+)')
+        # yushu = int(house_num) % num_per_page
+        # print 'yushu: ', yushu
+        # if yushu:
+        #   page_num += 1
+        if not page_num:
             if time == 1:
                 logging.debug('times come here: %s' % time)
                 yield scrapy.Request(response.url,
-                    callback=lambda response=response, time=time+1: self.get_page_num(response, time), dont_filter=True)
+                callback=lambda response=response, time=time + 1: self.get_page_num(response, time), dont_filter=True)
             return
-        logging.debug('times come here: %s' % time)
-        page_num = int(house_num) / num_per_page
-        yushu = int(house_num) % num_per_page
-        print 'yushu: ', yushu
-        if yushu:
-            page_num += 1
+        page_num = int(page_num)
+        logging.debug('page_num: %s' % page_num)
+
         for i in range(1, page_num+1):
-            next_page = response.url + 'i3' + str(i) + '/'
+            next_page = response.url[:-1] + '-i3' + str(i) + '/'
             logging.debug('next_page: %s' % next_page)
             yield scrapy.http.Request(next_page, callback=self.get_house_url)
 
@@ -97,8 +101,8 @@ class FangTXCrawl(scrapy.Spider):
             else:
                 self.item['name'] = name
             logging.debug('house_name: %s' % self.item['name'])
-            self.item['district'] = house.xpath(self.config.get(self.spidername, 'district')).extract_first()
-            self.item['bizcircle'] = house.xpath(self.config.get(self.spidername, 'bizcircle')).extract_first()
+            self.item['district'] = response.xpath(self.config.get(self.spidername, 'district')).extract_first()
+            self.item['bizcircle'] = response.xpath(self.config.get(self.spidername, 'bizcircle')).extract_first()
             self.item['datatype'] = self.config.get(self.spidername, 'datatype')
             self.item['provice'] = self.config.get(self.spidername, 'provice')
             self.item['city'] = self.config.get(self.spidername, 'city')
